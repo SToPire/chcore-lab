@@ -1,3 +1,5 @@
+### 实验1
+
 #### 练习1
 
 1. AArch64有31个通用寄存器（X0-X30），x86-64是8个。可以用W0-W30指定这些通用寄存器中的低32位部分。
@@ -45,4 +47,12 @@ r29是frame pointer(相当于ebp)，r30是返回地址，它们需要被在栈�
 #### 练习9
 
 我认为从栈上取前五个参数是不合理的，参数都是用寄存器传递，栈上的值只是callee-saved register，其值只是“恰好”等于参数值而已。
+
+### 实验2
+
+1. `split_page`的`order`参数说明似乎写错了，应该是目标块的order。
+
+#### 问题1
+
+bootloader应该是被读入由arch决定的固定位置，kernel编译时在`scripts/linker-aarch64.lds.in`里指定了各section的位置，bootloader按照elf里的信息加载。另外`mm_init`会在运行时具体设置`free_mem_start`及以上的地址空间，这个值是根据ld script里指定的`img_end`在运行时得到的，与内核镜像的大小有关。
 
