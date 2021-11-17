@@ -16,6 +16,7 @@ gdb:
 
 build: FORCE
 	./scripts/docker_build.sh
+	sed -i 's?\/chos?'`pwd`'?g' build/compile_commands.json
 
 qemu: $(IMAGES) 
 	$(QEMU) $(QEMUOPTS)
