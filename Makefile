@@ -16,6 +16,7 @@ gdb:
 
 build: FORCE
 	./scripts/docker_build.sh $(bin)
+	sed -i 's?\/chos?'`pwd`'?g' build/compile_commands.json
 
 user: FORCE
 	./scripts/docker_build_user.sh
