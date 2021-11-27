@@ -12,7 +12,7 @@ echo "compiling: aarch64 user directory"
 C_FLAGS="$C_FLAGS -DCONFIG_ARCH_AARCH64"
 
 cd build
-cmake .. -DCMAKE_C_FLAGS="$C_FLAGS" -G Ninja
+cmake .. -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_C_FLAGS="$C_FLAGS" -G Ninja
 
 ninja
 

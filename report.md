@@ -86,3 +86,18 @@ bootloader应该是被读入由arch决定的固定位置，kernel编译时在`sc
 2. 当前特权级如果低于页表项中指定的特权级，MMU抛出异常终止非法的内存访问。
 
 ### 实验3
+1. 内联汇编不能忘记指定clobbered registers，否则编译器不知道用户弄脏了哪些寄存器。
+
+#### 练习2
+
+首先使用`ramdisk_read_file`读入root process对应的二进制文件，然后使用`process_create`创建process结构体，该函数有一些capability相关的操作，并会使用`vmspace_init`创建进程地址空间。
+
+`process_create`返回后，开始执行`thread_create_main`创建进程中的第一个线程。该函数创建用户栈并在vmspace中进行虚拟地址映射，创建thread结构体，使用`prepare_env`准备用户栈上的初始状态（main的参数），使用`load_binary`读入elf文件到内存指定位置并设置pc。最后调用`thread_init`将stack，pc等信息装入线程内核栈。
+
+#### 练习4
+
+异常向量表中的`sync_el0_64`是系统调用的入口，它首先检查ESR_EL1的EC部分是否为ESR_EL1_EC_SVC_64（代表系统调用），如果是的话控制流来到`el0_syscall`，它首先进行一番先压栈在弹栈的迷之操作（？？），然后查syscall_table跳到对应的系统调用函数处。
+
+#### 练习7
+
+`START`是通过直接恢复上下文来调用的，返回地址是0。执行完`START`后PC变成了非法地址0从而触发Instruction Abort。

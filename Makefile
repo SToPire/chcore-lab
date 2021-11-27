@@ -20,6 +20,7 @@ build: FORCE
 
 user: FORCE
 	./scripts/docker_build_user.sh
+	sed -i 's?\/chos?'`pwd`'?g' user/build/compile_commands.json
 
 qemu: $(IMAGES) 
 	$(QEMU) $(QEMUOPTS)
