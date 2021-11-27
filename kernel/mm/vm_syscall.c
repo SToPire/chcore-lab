@@ -1,46 +1,45 @@
 /*
- * Copyright (c) 2020 Institute of Parallel And Distributed Systems (IPADS), Shanghai Jiao Tong University (SJTU)
- * OS-Lab-2020 (i.e., ChCore) is licensed under the Mulan PSL v1.
- * You can use this software according to the terms and conditions of the Mulan PSL v1.
- * You may obtain a copy of Mulan PSL v1 at:
+ * Copyright (c) 2020 Institute of Parallel And Distributed Systems (IPADS),
+ * Shanghai Jiao Tong University (SJTU) OS-Lab-2020 (i.e., ChCore) is licensed
+ * under the Mulan PSL v1. You can use this software according to the terms and
+ * conditions of the Mulan PSL v1. You may obtain a copy of Mulan PSL v1 at:
  *   http://license.coscl.org.cn/MulanPSL
- *   THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR
- *   IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR
- *   PURPOSE.
- *   See the Mulan PSL v1 for more details.
+ *   THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+ * KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE. See the
+ * Mulan PSL v1 for more details.
  */
 
-#include <mm/vmspace.h>
-#include <common/uaccess.h>
-#include <common/mm.h>
 #include <common/kmalloc.h>
+#include <common/mm.h>
+#include <common/uaccess.h>
+#include <mm/vmspace.h>
 
 #include <process/capability.h>
 #include <process/thread.h>
 
-int sys_create_device_pmo(u64 paddr, u64 size)
-{
-	int cap, r;
-	struct pmobject *pmo;
+int sys_create_device_pmo(u64 paddr, u64 size) {
+  int cap, r;
+  struct pmobject *pmo;
 
-	BUG_ON(size == 0);
-	pmo = obj_alloc(TYPE_PMO, sizeof(*pmo));
-	if (!pmo) {
-		r = -ENOMEM;
-		goto out_fail;
-	}
-	pmo_init(pmo, PMO_DEVICE, size, paddr);
-	cap = cap_alloc(current_process, pmo, 0);
-	if (cap < 0) {
-		r = cap;
-		goto out_free_obj;
-	}
+  BUG_ON(size == 0);
+  pmo = obj_alloc(TYPE_PMO, sizeof(*pmo));
+  if (!pmo) {
+    r = -ENOMEM;
+    goto out_fail;
+  }
+  pmo_init(pmo, PMO_DEVICE, size, paddr);
+  cap = cap_alloc(current_process, pmo, 0);
+  if (cap < 0) {
+    r = cap;
+    goto out_free_obj;
+  }
 
-	return cap;
- out_free_obj:
-	obj_free(pmo);
- out_fail:
-	return r;
+  return cap;
+out_free_obj:
+  obj_free(pmo);
+out_fail:
+  return r;
 }
 
 int sys_create_pmo(u64 size, u64 type)
@@ -69,48 +68,47 @@ int sys_create_pmo(u64 size, u64 type)
 }
 
 struct pmo_request {
-	/* args */
-	u64 size;
-	u64 type;
-	/* return value */
-	u64 ret_cap;
+  /* args */
+  u64 size;
+  u64 type;
+  /* return value */
+  u64 ret_cap;
 };
 
 #define MAX_CNT 32
 
-int sys_create_pmos(u64 user_buf, u64 cnt)
-{
-	u64 size;
-	struct pmo_request *requests;
-	int i;
-	int cap;
+int sys_create_pmos(u64 user_buf, u64 cnt) {
+  u64 size;
+  struct pmo_request *requests;
+  int i;
+  int cap;
 
-	/* in case of integer overflow */
-	if (cnt > MAX_CNT) {
-		kwarn("create too many pmos for one time (max: %d)\n", MAX_CNT);
-		return -EINVAL;
-	}
+  /* in case of integer overflow */
+  if (cnt > MAX_CNT) {
+    kwarn("create too many pmos for one time (max: %d)\n", MAX_CNT);
+    return -EINVAL;
+  }
 
-	size = sizeof(*requests) * cnt;
-	requests = (struct pmo_request *)kmalloc(size);
-	if (requests == NULL) {
-		kwarn("cannot allocate more memory\n");
-		return -EAGAIN;
-	}
-	copy_from_user((char *)requests, (char *)user_buf, size);
+  size = sizeof(*requests) * cnt;
+  requests = (struct pmo_request *)kmalloc(size);
+  if (requests == NULL) {
+    kwarn("cannot allocate more memory\n");
+    return -EAGAIN;
+  }
+  copy_from_user((char *)requests, (char *)user_buf, size);
 
-	for (i = 0; i < cnt; ++i) {
-		cap = sys_create_pmo(requests[i].size, requests[i].type);
-		requests[i].ret_cap = cap;
-	}
+  for (i = 0; i < cnt; ++i) {
+    cap = sys_create_pmo(requests[i].size, requests[i].type);
+    requests[i].ret_cap = cap;
+  }
 
-	/* return pmo_caps */
-	copy_to_user((char *)user_buf, (char *)requests, size);
+  /* return pmo_caps */
+  copy_to_user((char *)user_buf, (char *)requests, size);
 
-	/* free temporary buffer */
-	kfree(requests);
+  /* free temporary buffer */
+  kfree(requests);
 
-	return 0;
+  return 0;
 }
 
 #define WRITE_PMO	0
@@ -159,14 +157,12 @@ static int read_write_pmo(u64 pmo_cap, u64 offset, u64 user_buf,
  * A process can send a PMO (with msgs) to others.
  * It can write the msgs without mapping the PMO with this function.
  */
-int sys_write_pmo(u64 pmo_cap, u64 offset, u64 user_ptr, u64 len)
-{
-	return read_write_pmo(pmo_cap, offset, user_ptr, len, WRITE_PMO);
+int sys_write_pmo(u64 pmo_cap, u64 offset, u64 user_ptr, u64 len) {
+  return read_write_pmo(pmo_cap, offset, user_ptr, len, WRITE_PMO);
 }
 
-int sys_read_pmo(u64 pmo_cap, u64 offset, u64 user_ptr, u64 len)
-{
-	return read_write_pmo(pmo_cap, offset, user_ptr, len, READ_PMO);
+int sys_read_pmo(u64 pmo_cap, u64 offset, u64 user_ptr, u64 len) {
+  return read_write_pmo(pmo_cap, offset, user_ptr, len, READ_PMO);
 }
 
 /*
@@ -222,51 +218,49 @@ int sys_map_pmo(u64 target_process_cap, u64 pmo_cap, u64 addr, u64 perm)
 }
 
 struct pmo_map_request {
-	/* args */
-	u64 pmo_cap;
-	u64 addr;
-	u64 perm;
+  /* args */
+  u64 pmo_cap;
+  u64 addr;
+  u64 perm;
 
-	/* return caps or return value */
-	u64 ret;
+  /* return caps or return value */
+  u64 ret;
 };
 
-int sys_map_pmos(u64 target_process_cap, u64 user_buf, u64 cnt)
-{
-	u64 size;
-	struct pmo_map_request *requests;
-	int i;
-	int ret;
+int sys_map_pmos(u64 target_process_cap, u64 user_buf, u64 cnt) {
+  u64 size;
+  struct pmo_map_request *requests;
+  int i;
+  int ret;
 
-	/* in case of integer overflow */
-	if (cnt > MAX_CNT) {
-		kwarn("create too many pmos for one time (max: %d)\n", MAX_CNT);
-		return -EINVAL;
-	}
+  /* in case of integer overflow */
+  if (cnt > MAX_CNT) {
+    kwarn("create too many pmos for one time (max: %d)\n", MAX_CNT);
+    return -EINVAL;
+  }
 
-	size = sizeof(*requests) * cnt;
-	requests = (struct pmo_map_request *)kmalloc(size);
-	if (requests == NULL) {
-		kwarn("cannot allocate more memory\n");
-		return -EAGAIN;
-	}
-	copy_from_user((char *)requests, (char *)user_buf, size);
+  size = sizeof(*requests) * cnt;
+  requests = (struct pmo_map_request *)kmalloc(size);
+  if (requests == NULL) {
+    kwarn("cannot allocate more memory\n");
+    return -EAGAIN;
+  }
+  copy_from_user((char *)requests, (char *)user_buf, size);
 
-	for (i = 0; i < cnt; ++i) {
-		/*
-		 * if target_process is not current_process,
-		 * ret is cap on success.
-		 */
-		ret = sys_map_pmo(target_process_cap,
-				  requests[i].pmo_cap,
-				  requests[i].addr, requests[i].perm);
-		requests[i].ret = ret;
-	}
+  for (i = 0; i < cnt; ++i) {
+    /*
+     * if target_process is not current_process,
+     * ret is cap on success.
+     */
+    ret = sys_map_pmo(target_process_cap, requests[i].pmo_cap, requests[i].addr,
+                      requests[i].perm);
+    requests[i].ret = ret;
+  }
 
-	copy_to_user((char *)user_buf, (char *)requests, size);
+  copy_to_user((char *)user_buf, (char *)requests, size);
 
-	kfree(requests);
-	return 0;
+  kfree(requests);
+  return 0;
 }
 
 int sys_unmap_pmo(u64 target_process_cap, u64 pmo_cap, u64 addr)
@@ -314,44 +308,70 @@ int sys_unmap_pmo(u64 target_process_cap, u64 pmo_cap, u64 addr)
  * defined in mm/vmregion.c
  */
 
-u64 sys_handle_brk(u64 addr)
-{
-	struct vmspace *vmspace;
-	struct pmobject *pmo;
-	struct vmregion *vmr;
-	size_t len;
-	u64 retval;
-	int ret;
+u64 sys_handle_brk(u64 addr) {
+  struct vmspace *vmspace;
+  struct pmobject *pmo;
+  struct vmregion *vmr;
+  size_t len;
+  u64 retval;
+  int ret;
 
-	vmspace = obj_get(current_process, VMSPACE_OBJ_ID, TYPE_VMSPACE);
+  vmspace = obj_get(current_process, VMSPACE_OBJ_ID, TYPE_VMSPACE);
 
-	/*
-	 * Lab3: Your code here
-	 * The sys_handle_brk syscall modifies the top address of heap to addr.
-	 *
-	 * If addr is 0, this function should initialize the heap, implemeted by:
-	 * 1. Create a new pmo with size 0 and type PMO_ANONYM.
-	 * 2. Initialize vmspace->heap_vmr using function init_heap_vmr(), which generates 
-	 * the mapping between  user heap's virtual address (already stored in 
-	 * vmspace->user_current_heap) and the pmo you just created.
-	 *
-	 * HINT: For more details about how to create and initiailze a pmo, check function 
-	 * 'load_binary' for reference.
-	 *
-	 * If addr is larger than heap, the size of vmspace->heap_vmr and the size of its 
-	 * coresponding pmo should be updated. Real physical memory allocation are done in 
-	 * a lazy manner using pagefault handler later at the first access time. 
-	 *
-	 * If addr is smaller than heap, do nothing and return -EINVAL since we are not going
-	 * to support shink heap. For all other cases, return the virtual address of the heap 
-	 * top.
-	 *
-	 */
+  /*
+   * Lab3: Your code here
+   * The sys_handle_brk syscall modifies the top address of heap to addr.
+   *
+   * If addr is 0, this function should initialize the heap, implemeted by:
+   * 1. Create a new pmo with size 0 and type PMO_ANONYM.
+   * 2. Initialize vmspace->heap_vmr using function init_heap_vmr(), which
+   * generates the mapping between  user heap's virtual address (already stored
+   * in vmspace->user_current_heap) and the pmo you just created.
+   *
+   * HINT: For more details about how to create and initiailze a pmo, check
+   * function 'load_binary' for reference.
+   *
+   * If addr is larger than heap, the size of vmspace->heap_vmr and the size of
+   * its coresponding pmo should be updated. Real physical memory allocation are
+   * done in a lazy manner using pagefault handler later at the first access
+   * time.
+   *
+   * If addr is smaller than heap, do nothing and return -EINVAL since we are
+   * not going to support shink heap. For all other cases, return the virtual
+   * address of the heap top.
+   *
+   */
 
-	/*
-	 * return origin heap addr on failure;
-	 * return new heap addr on success.
-	 */
-	obj_put(vmspace);
-	return retval;
+  if (addr == 0) {
+    pmo = obj_alloc(TYPE_PMO, sizeof(*pmo));
+    if (!pmo) {
+      retval = -ENOMEM;
+      goto ret;
+    }
+    pmo_init(pmo, PMO_ANONYM, 0, 0);
+    if ((vmspace->heap_vmr =
+             init_heap_vmr(vmspace, vmspace->user_current_heap, pmo)) == NULL) {
+      retval = -ENOMEM;
+      goto ret;
+    }
+    retval = vmspace->user_current_heap;
+  } else if (addr > vmspace->user_current_heap) {
+    u64 delta = addr - vmspace->user_current_heap;
+    vmspace->heap_vmr->size += delta;
+    vmspace->heap_vmr->pmo->size += delta;
+    vmspace->user_current_heap = retval = addr;
+  } else if (addr < vmspace->user_current_heap) {
+    retval = -EINVAL;
+  } else {
+    retval = vmspace->user_current_heap;
+  }
+
+  /*
+   * return origin heap addr on failure;
+   * return new heap addr on success.
+   */
+
+ret:
+  obj_put(vmspace);
+  return retval;
 }
