@@ -57,9 +57,15 @@ int rr_sched_enqueue(struct thread *thread)
 	if(thread->thread_ctx->type == TYPE_IDLE) 
 		return 0;
 
-	list_append(&thread->ready_queue_node, &rr_ready_queue[smp_get_cpu_id()]);
+	s32 cpu_id = thread->thread_ctx->affinity;
+	if(cpu_id == NO_AFF)
+		cpu_id = smp_get_cpu_id();
+	if(!(cpu_id >= 0 && cpu_id <= PLAT_CPU_NUM - 1))
+		return -EPERM;
+
+	list_append(&thread->ready_queue_node, &rr_ready_queue[cpu_id]);
 	thread->thread_ctx->state = TS_READY;
-	thread->thread_ctx->cpuid = smp_get_cpu_id();
+	thread->thread_ctx->cpuid = cpu_id;
 
 	return 0;
 }
@@ -104,6 +110,7 @@ struct thread *rr_sched_choose_thread(void)
 
 static inline void rr_sched_refill_budget(struct thread *target, u32 budget)
 {
+	target->thread_ctx->sc->budget = budget;
 }
 
 /*
@@ -121,12 +128,16 @@ static inline void rr_sched_refill_budget(struct thread *target, u32 budget)
 int rr_sched(void)
 {
 	struct thread* cur_thread = current_thread;
+
+	// 必须考虑cur_thread为空的情形！！见sys_exit实现。cur_thread为空不能直接返回，得调度一个thread上去。
+	if(cur_thread && cur_thread->thread_ctx->sc->budget > 0) 
+		return 0;
+
 	rr_sched_enqueue(cur_thread);
 
 	struct thread* nxt_thread = rr_sched_choose_thread();
-	switch_to_thread(nxt_thread);
-
-	return 0;
+	rr_sched_refill_budget(nxt_thread, DEFAULT_BUDGET);//一定要在出队的时候refill budget而不能在入队时，因为cur_thread可能为NULL，另外有idle的存在。
+	return switch_to_thread(nxt_thread);
 }
 
 /*
@@ -167,6 +178,8 @@ int rr_sched_init(void)
  */
 void rr_sched_handle_timer_irq(void)
 {
+	if(current_thread && current_thread->thread_ctx->sc->budget > 0)
+		--current_thread->thread_ctx->sc->budget;
 }
 
 struct sched_ops rr = {

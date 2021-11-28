@@ -380,7 +380,19 @@ int sys_set_affinity(u64 thread_cap, s32 aff)
 	 * Lab4
 	 * Finish the sys_set_affinity
 	 */
-	return -1;
+
+  if (!thread)
+    return -EPERM;
+  
+  if (aff != NO_AFF && (aff < 0 || aff >= PLAT_CPU_NUM))
+    ret = -EPERM;
+  else
+    thread->thread_ctx->affinity = aff;
+
+  if(thread_cap != -1) 
+    obj_put(thread); // match to obj_get
+
+  return ret;
 }
 
 int sys_get_affinity(u64 thread_cap)
@@ -401,5 +413,13 @@ int sys_get_affinity(u64 thread_cap)
 	 * Lab4
 	 * Finish the sys_get_affinity
 	 */
-	return -1;
+	if (!thread)
+    return -EPERM;
+  
+  aff = thread->thread_ctx->affinity;
+  
+  if(thread_cap != -1) 
+    obj_put(thread); // match to obj_get
+
+  return aff;
 }

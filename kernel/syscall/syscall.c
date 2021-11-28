@@ -35,7 +35,7 @@ u32 sys_getc(void) { return uart_recv(); }
  * Lab4
  * Finish the sys_get_cpu_id syscall
  */
-u32 sys_get_cpu_id(void) { return -1; }
+u32 sys_get_cpu_id(void) { return smp_get_cpu_id(); }
 
 /*
  * Lab3: Your code here

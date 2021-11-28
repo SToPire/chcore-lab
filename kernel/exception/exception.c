@@ -32,7 +32,7 @@ void exception_init_per_cpu(void)
 	 * Uncomment the timer_init() when you are handling preemptive
 	 * shceduling
 	 */
-	// timer_init();
+	timer_init();
 
 	/**
 	 * Lab3: Your code here
@@ -55,7 +55,7 @@ void handle_entry_c(int type, u64 esr, u64 address)
 	 * Lab4
 	 * Acquire the big kernel lock, if the exception is not from kernel
 	 */
-	 
+
 	// type == [8,15] 
 	if(type >= SYNC_EL0_64 && type <= ERROR_EL0_32)
 		lock_kernel();
