@@ -46,12 +46,22 @@ struct thread idle_threads[PLAT_CPU_NUM];
  * Sched_enqueue
  * Put `thread` at the end of ready queue of assigned `affinity`.
  * If affinity = NO_AFF, assign the core to the current cpu.
- * If the thread is IDEL thread, do nothing!
+ * If the thread is IDLE thread, do nothing!
  * Do not forget to check if the affinity is valid!
  */
 int rr_sched_enqueue(struct thread *thread)
 {
-	return -1;
+	if(!thread || !thread->thread_ctx || thread->thread_ctx->state == TS_READY)
+		return -EPERM;
+
+	if(thread->thread_ctx->type == TYPE_IDLE) 
+		return 0;
+
+	list_append(&thread->ready_queue_node, &rr_ready_queue[smp_get_cpu_id()]);
+	thread->thread_ctx->state = TS_READY;
+	thread->thread_ctx->cpuid = smp_get_cpu_id();
+
+	return 0;
 }
 
 /*
@@ -62,7 +72,13 @@ int rr_sched_enqueue(struct thread *thread)
  */
 int rr_sched_dequeue(struct thread *thread)
 {
-	return -1;
+	if(!thread || !thread->thread_ctx || thread->thread_ctx->state != TS_READY)
+		return -EPERM;
+
+	list_del(&thread->ready_queue_node);
+	thread->thread_ctx->state = TS_INTER;
+	
+	return 0;
 }
 
 /*
@@ -78,7 +94,12 @@ int rr_sched_dequeue(struct thread *thread)
  */
 struct thread *rr_sched_choose_thread(void)
 {
-	return NULL;
+	if(list_empty(&rr_ready_queue[smp_get_cpu_id()]))
+		return &idle_threads[smp_get_cpu_id()];
+	
+	struct thread* fst_thread = list_entry(rr_ready_queue[smp_get_cpu_id()].next, struct thread, ready_queue_node);
+	rr_sched_dequeue(fst_thread);
+	return fst_thread;
 }
 
 static inline void rr_sched_refill_budget(struct thread *target, u32 budget)
@@ -99,7 +120,13 @@ static inline void rr_sched_refill_budget(struct thread *target, u32 budget)
  */
 int rr_sched(void)
 {
-	return -1;
+	struct thread* cur_thread = current_thread;
+	rr_sched_enqueue(cur_thread);
+
+	struct thread* nxt_thread = rr_sched_choose_thread();
+	switch_to_thread(nxt_thread);
+
+	return 0;
 }
 
 /*
