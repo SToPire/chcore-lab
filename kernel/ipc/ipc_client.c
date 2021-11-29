@@ -99,6 +99,9 @@ static int create_connection(struct thread *source, struct thread *target,
 		ret = -ENOMEM;
 		goto out_fail;
 	}
+
+	conn->callback = conn->target->server_ipc_config->callback;
+
 	// Get the server's ipc config
 	server_ipc_config = target->server_ipc_config;
 	vm_config = &server_ipc_config->vm_config;

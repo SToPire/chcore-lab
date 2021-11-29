@@ -96,8 +96,30 @@ bootloader应该是被读入由arch决定的固定位置，kernel编译时在`sc
 
 #### 练习4
 
-异常向量表中的`sync_el0_64`是系统调用的入口，它首先检查ESR_EL1的EC部分是否为ESR_EL1_EC_SVC_64（代表系统调用），如果是的话控制流来到`el0_syscall`，它首先进行一番先压栈在弹栈的迷之操作（？？），然后查syscall_table跳到对应的系统调用函数处。
+异常向量表中的`sync_el0_64`是系统调用的入口，它首先检查ESR_EL1的EC部分是否为ESR_EL1_EC_SVC_64（代表系统调用），如果是的话控制流来到`el0_syscall`，它首先进行一番先压栈在弹栈的操作（lab4中可以解释，这是在调用c函数`lock_kernel`），然后查syscall_table跳到对应的系统调用函数处。
 
 #### 练习7
 
 `START`是通过直接恢复上下文来调用的，返回地址是0。执行完`START`后PC变成了非法地址0从而触发Instruction Abort。
+
+### 实验4
+
+#### 练习1
+
+通过mpidr_el1寄存器低8位的值判断是否为主CPU。
+
+AP全部在wait_until_smp_enabled处自旋，直到BSP依次通过修改secondary_boot_flag唤醒它们为止。
+
+#### 练习3
+
+每个CPU有自己的kernel_stack和secondary_boot_flag和cpu_status，这是它们获取大内核锁前唯三使用的全局变量。所以应该不会出现data race。
+
+#### 练习6
+
+`lock_kernel`时需要保护寄存器是因为c函数夹在汇编中间，而且后面的汇编逻辑还依赖寄存器的值，所以理论上要保护caller saved registers。
+
+`exception_return`时不保护是因为后面就从内存上恢复寄存器了，当前的值已经不重要。
+
+#### 练习8
+
+idle thread逻辑上是一个自旋线程，执行的并非内核代码，但却是运行在内核态。根据ESR寄存器的值判断异常来源的原理是异常是否来自用户态，在这里是一个特殊逻辑。忽视这个特殊逻辑不拿锁会导致unlock比lock多，这样本该拿到锁的lock调用会自旋，导致永远阻塞。
