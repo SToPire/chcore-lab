@@ -109,6 +109,11 @@ static int get_next_ptp(ptp_t *cur_ptp, u32 level, vaddr_t va, ptp_t **next_ptp,
       new_ptp_paddr = virt_to_phys((vaddr_t)new_ptp);
 
       new_pte_val.pte = 0;
+
+      /* 这些本来应该只对L0, L1和L2 entry适用，
+       * 但l3_page结构体中对应成员的位置恰好与table一致，
+       * 所以也可以用于level==3的情况。
+       */
       new_pte_val.table.is_valid = 1;
       new_pte_val.table.is_table = 1;
       new_pte_val.table.next_table_addr = new_ptp_paddr >> PAGE_SHIFT;
@@ -192,6 +197,8 @@ int map_range_in_pgtbl(vaddr_t *pgtbl, vaddr_t va, paddr_t pa, size_t len,
                        vmr_prop_t flags) {
   // <lab2>
 
+  if(len == 0) return 0;
+
   // va, pa and len should be aligned to pagesize
   BUG_ON(GET_VA_OFFSET_L3(va) || GET_VA_OFFSET_L3(pa) || GET_VA_OFFSET_L3(len));
 
@@ -211,9 +218,14 @@ int map_range_in_pgtbl(vaddr_t *pgtbl, vaddr_t va, paddr_t pa, size_t len,
         cur_ptp = next_ptp;
       }
 
-      pte->l1_block.pfn = pa >> (PAGE_SHIFT + PAGE_ORDER * 2);
+      pte->pte = 0;
+      pte->l1_block.pfn = (pa + offset) >> (PAGE_SHIFT + PAGE_ORDER * 2);
+      pte->l1_block.UXN = (flags & KERNEL_PT) ? AARCH64_PTE_UXN : AARCH64_PTE_UXN;
+      pte->l1_block.AF = AARCH64_PTE_AF_ACCESSED;
+      pte->l1_block.SH = INNER_SHAREABLE;
+      pte->l1_block.attr_index = NORMAL_MEMORY;
       pte->l1_block.is_table = 0;
-      set_pte_flags(pte, flags, va >= KBASE ? KERNEL_PTE : USER_PTE);
+      pte->l1_block.is_valid = 1;
     }
   } else if (GET_VA_OFFSET_L2(va) == 0 && GET_VA_OFFSET_L2(pa) == 0 &&
              GET_VA_OFFSET_L2(len) == 0) {
@@ -228,9 +240,14 @@ int map_range_in_pgtbl(vaddr_t *pgtbl, vaddr_t va, paddr_t pa, size_t len,
         cur_ptp = next_ptp;
       }
 
-      pte->l2_block.pfn = pa >> (PAGE_SHIFT + PAGE_ORDER * 2);
+      pte->pte = 0;
+      pte->l2_block.pfn = (pa + offset) >> (PAGE_SHIFT + PAGE_ORDER);
+      pte->l2_block.UXN = (flags & KERNEL_PT) ? AARCH64_PTE_UXN : AARCH64_PTE_UXN;
+      pte->l2_block.AF = AARCH64_PTE_AF_ACCESSED;
+      pte->l2_block.SH = INNER_SHAREABLE;
+      pte->l2_block.attr_index = NORMAL_MEMORY;
       pte->l2_block.is_table = 0;
-      set_pte_flags(pte, flags, va >= KBASE ? KERNEL_PTE : USER_PTE);
+      pte->l2_block.is_valid = 1;
     }
   } else {
     for (size_t offset = 0; offset < len; offset += PAGE_SIZE) {
@@ -245,7 +262,7 @@ int map_range_in_pgtbl(vaddr_t *pgtbl, vaddr_t va, paddr_t pa, size_t len,
       }
 
       pte->l3_page.pfn = (pa + offset) >> PAGE_SHIFT;
-      set_pte_flags(pte, flags, va >= KBASE ? KERNEL_PTE : USER_PTE);
+      set_pte_flags(pte, flags, (va + offset) >= KBASE ? KERNEL_PTE : USER_PTE);
     }
   }
   flush_tlb();

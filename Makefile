@@ -50,6 +50,7 @@ endif
 .PHONY: clean
 clean:
 	@rm -rf build
+	@rm -rf user/build
 	@rm -rf chcore.out
 
 prep-%:
