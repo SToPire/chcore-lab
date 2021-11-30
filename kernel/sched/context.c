@@ -57,6 +57,10 @@ void init_thread_ctx(struct thread *thread, u64 stack, u64 func, u32 prio,
 	 */
 
 	/* Fill the context of the thread */
+	memset(thread->thread_ctx->ec.reg, 0, sizeof(thread->thread_ctx->ec.reg));
+	thread->thread_ctx->ec.reg[ELR_EL1] = func;
+	thread->thread_ctx->ec.reg[SP_EL0] = stack;
+	thread->thread_ctx->ec.reg[SPSR_EL1] = SPSR_EL1_USER;
 
 	/* Set thread type */
 	thread->thread_ctx->type = type;

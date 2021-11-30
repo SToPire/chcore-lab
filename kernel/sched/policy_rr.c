@@ -47,12 +47,28 @@ struct thread idle_threads[PLAT_CPU_NUM];
  * Sched_enqueue
  * Put `thread` at the end of ready queue of assigned `affinity`.
  * If affinity = NO_AFF, assign the core to the current cpu.
- * If the thread is IDEL thread, do nothing!
+ * If the thread is IDLE thread, do nothing!
  * Do not forget to check if the affinity is valid!
  */
 int rr_sched_enqueue(struct thread *thread)
 {
-	return -1;
+	if(!thread || !thread->thread_ctx || thread->thread_ctx->state == TS_READY)
+		return -EPERM;
+
+	if(thread->thread_ctx->type == TYPE_IDLE) 
+		return 0;
+
+	s32 cpu_id = thread->thread_ctx->affinity;
+	if(cpu_id == NO_AFF)
+		cpu_id = smp_get_cpu_id();
+	if(!(cpu_id >= 0 && cpu_id <= PLAT_CPU_NUM - 1))
+		return -EPERM;
+
+	list_append(&thread->ready_queue_node, &rr_ready_queue[cpu_id]);
+	thread->thread_ctx->state = TS_READY;
+	thread->thread_ctx->cpuid = cpu_id;
+
+	return 0;
 }
 
 /*
@@ -63,7 +79,13 @@ int rr_sched_enqueue(struct thread *thread)
  */
 int rr_sched_dequeue(struct thread *thread)
 {
-	return -1;
+	if(!thread || !thread->thread_ctx || thread->thread_ctx->state != TS_READY)
+		return -EPERM;
+
+	list_del(&thread->ready_queue_node);
+	thread->thread_ctx->state = TS_INTER;
+	
+	return 0;
 }
 
 /*
@@ -79,11 +101,17 @@ int rr_sched_dequeue(struct thread *thread)
  */
 struct thread *rr_sched_choose_thread(void)
 {
-	return NULL;
+	if(list_empty(&rr_ready_queue[smp_get_cpu_id()]))
+		return &idle_threads[smp_get_cpu_id()];
+	
+	struct thread* fst_thread = list_entry(rr_ready_queue[smp_get_cpu_id()].next, struct thread, ready_queue_node);
+	rr_sched_dequeue(fst_thread);
+	return fst_thread;
 }
 
 static inline void rr_sched_refill_budget(struct thread *target, u32 budget)
 {
+	target->thread_ctx->sc->budget = budget;
 }
 
 /*
@@ -100,7 +128,17 @@ static inline void rr_sched_refill_budget(struct thread *target, u32 budget)
  */
 int rr_sched(void)
 {
-	return -1;
+	struct thread* cur_thread = current_thread;
+
+	// 必须考虑cur_thread为空的情形！！见sys_exit实现。cur_thread为空不能直接返回，得调度一个thread上去。
+	if(cur_thread && cur_thread->thread_ctx->sc->budget > 0) 
+		return 0;
+
+	rr_sched_enqueue(cur_thread);
+
+	struct thread* nxt_thread = rr_sched_choose_thread();
+	rr_sched_refill_budget(nxt_thread, DEFAULT_BUDGET);//一定要在出队的时候refill budget而不能在入队时，因为cur_thread可能为NULL，另外有idle的存在。
+	return switch_to_thread(nxt_thread);
 }
 
 /*
@@ -141,6 +179,8 @@ int rr_sched_init(void)
  */
 void rr_sched_handle_timer_irq(void)
 {
+	if(current_thread && current_thread->thread_ctx->sc->budget > 0)
+		--current_thread->thread_ctx->sc->budget;
 }
 
 void rr_top(void)

@@ -17,7 +17,7 @@ fi
 echo "compiling kernel ..."
 cd build
 
-cmake -DCMAKE_LINKER=aarch64-linux-gnu-ld -DCMAKE_C_LINK_EXECUTABLE="<CMAKE_LINKER> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>" .. -G Ninja "$@"
-
+cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_LINKER=aarch64-linux-gnu-ld -DCMAKE_C_LINK_EXECUTABLE="<CMAKE_LINKER> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>" .. -G Ninja "$@"
+echo "before ninja"
 ninja
 aarch64-linux-gnu-nm -n kernel.img > kernel.sym

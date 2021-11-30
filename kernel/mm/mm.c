@@ -1,44 +1,44 @@
 /*
- * Copyright (c) 2020 Institute of Parallel And Distributed Systems (IPADS), Shanghai Jiao Tong University (SJTU)
- * OS-Lab-2020 (i.e., ChCore) is licensed under the Mulan PSL v1.
- * You can use this software according to the terms and conditions of the Mulan PSL v1.
- * You may obtain a copy of Mulan PSL v1 at:
+ * Copyright (c) 2020 Institute of Parallel And Distributed Systems (IPADS),
+ * Shanghai Jiao Tong University (SJTU) OS-Lab-2020 (i.e., ChCore) is licensed
+ * under the Mulan PSL v1. You can use this software according to the terms and
+ * conditions of the Mulan PSL v1. You may obtain a copy of Mulan PSL v1 at:
  *   http://license.coscl.org.cn/MulanPSL
- *   THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR
- *   IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR
- *   PURPOSE.
- *   See the Mulan PSL v1 for more details.
+ *   THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+ * KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE. See the
+ * Mulan PSL v1 for more details.
  */
 
-#include <common/mm.h>
 #include <common/kprint.h>
 #include <common/macro.h>
+#include <common/mm.h>
 
 #include "buddy.h"
 #include "slab.h"
 
 extern unsigned long *img_end;
 
-#define PHYSICAL_MEM_START (24*1024*1024)	//24M
+#define PHYSICAL_MEM_START (24 * 1024 * 1024) // 24M
 
-#define START_VADDR phys_to_virt(PHYSICAL_MEM_START)	//24M
-#define NPAGES (128*1000)
+#define START_VADDR phys_to_virt(PHYSICAL_MEM_START) // 24M
+#define NPAGES (128 * 1000)
 
-#define PHYSICAL_MEM_END (PHYSICAL_MEM_START+NPAGES*BUDDY_PAGE_SIZE)
+#define PHYSICAL_MEM_END (PHYSICAL_MEM_START + NPAGES * BUDDY_PAGE_SIZE)
 
 /*
  * Layout:
  *
- * | metadata (npages * sizeof(struct page)) | start_vaddr ... (npages * PAGE_SIZE) |
+ * | metadata (npages * sizeof(struct page)) | start_vaddr ... (npages *
+ * PAGE_SIZE) |
  *
  */
 
-unsigned long get_ttbr1(void)
-{
-	unsigned long pgd;
+unsigned long get_ttbr1(void) {
+  unsigned long pgd;
 
-	__asm__("mrs %0,ttbr1_el1":"=r"(pgd));
-	return pgd;
+  __asm__("mrs %0,ttbr1_el1" : "=r"(pgd));
+  return pgd;
 }
 
 /*
@@ -48,21 +48,19 @@ unsigned long get_ttbr1(void)
  * 2. fill the block entry with corresponding attribution bit
  *
  */
-void map_kernel_space(vaddr_t va, paddr_t pa, size_t len)
-{
-	// <lab2>
-
-	// </lab2>
+void map_kernel_space(vaddr_t va, paddr_t pa, size_t len) {
+  // <lab2>
+  map_range_in_pgtbl((vaddr_t *)get_ttbr1(), va, pa, len, 0);
+  // </lab2>
 }
 
-void kernel_space_check(void)
-{
-	unsigned long kernel_val;
-	for (unsigned long i = 128; i < 256; i++) {
-		kernel_val = *(unsigned long *)(KBASE + (i << 21));
-		kinfo("kernel_val: %lx\n", kernel_val);
-	}
-	kinfo("kernel space check pass\n");
+void kernel_space_check(void) {
+  unsigned long kernel_val;
+  for (unsigned long i = 128; i < 256; i++) {
+    kernel_val = *(unsigned long *)(KBASE + (i << 21));
+    kinfo("kernel_val: %lx\n", kernel_val);
+  }
+  kinfo("kernel space check pass\n");
 }
 
 struct phys_mem_pool global_mem;
