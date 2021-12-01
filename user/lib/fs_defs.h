@@ -14,6 +14,8 @@
 #define TMPFS_GET_SIZE	999
 
 #define TMPFS_INFO_VADDR 0x200000
+
+// buffer size = PAGE_SIZE, see boot_fs()
 #define TMPFS_SCAN_BUF_VADDR 0x20000000
 #define TMPFS_READ_BUF_VADDR 0x30000000
 

@@ -196,7 +196,7 @@ int query_in_pgtbl(vaddr_t *pgtbl, vaddr_t va, paddr_t *pa, pte_t **entry) {
 int map_range_in_pgtbl(vaddr_t *pgtbl, vaddr_t va, paddr_t pa, size_t len,
                        vmr_prop_t flags) {
   // <lab2>
-
+  
   if(len == 0) return 0;
 
   // va, pa and len should be aligned to pagesize
@@ -220,7 +220,7 @@ int map_range_in_pgtbl(vaddr_t *pgtbl, vaddr_t va, paddr_t pa, size_t len,
 
       pte->pte = 0;
       pte->l1_block.pfn = (pa + offset) >> (PAGE_SHIFT + PAGE_ORDER * 2);
-      pte->l1_block.UXN = (flags & KERNEL_PT) ? AARCH64_PTE_UXN : AARCH64_PTE_UXN;
+      pte->l1_block.UXN = (flags & KERNEL_PT) ? AARCH64_PTE_UXN : AARCH64_PTE_PXN;
       pte->l1_block.AF = AARCH64_PTE_AF_ACCESSED;
       pte->l1_block.SH = INNER_SHAREABLE;
       pte->l1_block.attr_index = NORMAL_MEMORY;
@@ -242,7 +242,7 @@ int map_range_in_pgtbl(vaddr_t *pgtbl, vaddr_t va, paddr_t pa, size_t len,
 
       pte->pte = 0;
       pte->l2_block.pfn = (pa + offset) >> (PAGE_SHIFT + PAGE_ORDER);
-      pte->l2_block.UXN = (flags & KERNEL_PT) ? AARCH64_PTE_UXN : AARCH64_PTE_UXN;
+      pte->l2_block.UXN = (flags & KERNEL_PT) ? AARCH64_PTE_UXN : AARCH64_PTE_PXN;
       pte->l2_block.AF = AARCH64_PTE_AF_ACCESSED;
       pte->l2_block.SH = INNER_SHAREABLE;
       pte->l2_block.attr_index = NORMAL_MEMORY;
@@ -250,6 +250,7 @@ int map_range_in_pgtbl(vaddr_t *pgtbl, vaddr_t va, paddr_t pa, size_t len,
       pte->l2_block.is_valid = 1;
     }
   } else {
+
     for (size_t offset = 0; offset < len; offset += PAGE_SIZE) {
       cur_ptp = (ptp_t *)pgtbl;
 

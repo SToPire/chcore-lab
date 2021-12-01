@@ -127,3 +127,5 @@ idle thread逻辑上是一个自旋线程，执行的并非内核代码，但却
 ### 实验5
 
 1. lab2里有祖传bug，映射内核的时候页表权限位设置不对，导致lab5中读入文件的时候calloc失败。
+2. user/lib/liblauncher.c里的`fs_read()`展示了如何在shell里用ipc去调文件系统的接口。
+3. 利用ipc调文件系统接口时要注意：文件系统进程并没有共享缓冲区的页表映射，要在server进程重新map_pmo。

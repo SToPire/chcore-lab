@@ -9,7 +9,7 @@ char getch()
 {
 	char c;
 	// TODO: your code here
-
+	c = (char)usys_getc();
 	return c;
 }
 
@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 	usys_fs_load_cpio(CPIO_BIN);
 
 	boot_fs();
-
+	
 	while (1) {
 		printf("\n");
 		buf = readline("$ ");

@@ -19,14 +19,18 @@ static int tmpfs_scan_pmo_cap;
 int fs_server_cap;
 
 #define BUFLEN	4096
+static char pwd[BUFLEN] = "/";
+
+#define SCAN_FOR_LS 0
+#define SCAN_FOR_COMPLEMENT 1
+void fs_scan(char *path, int type, char *buf, char *complement, int complement_cnt);
 
 static int do_complement(char *buf, char *complement, int complement_time)
 {
-	int r = -1;
 	// TODO: your code here
-
-	return r;
-
+	fs_scan(pwd, SCAN_FOR_COMPLEMENT, buf, complement, complement_time);
+	printf("%s", complement); 
+	return 0;
 }
 
 extern char getch();
@@ -53,7 +57,20 @@ char *readline(const char *prompt)
 		if (c < 0)
 			return NULL;
 		// TODO: your code here
-
+		if (c == '\r' || c == '\n') { //回车
+			buf[i] = '\0';
+			i = 0;
+			usys_putc('\n');
+			break;
+		} else if (c == '\t') {
+			buf[i] = '\0';
+			do_complement(buf, complement, ++complement_time);
+			i = strlen(buf);
+		} else {
+			complement_time = 0;
+			usys_putc(c);
+			buf[i++] = c;
+		}
 	}
 	return buf;
 }
@@ -66,20 +83,65 @@ int do_cd(char *cmdline)
 	if (*cmdline == '\0')
 		return 0;
 	if (*cmdline != '/') {
+		strcat(pwd, cmdline);
+	} else {
+		strcpy(pwd, cmdline);
 	}
-	printf("Build-in command cd %s: Not implemented!\n", cmdline);
 	return 0;
 }
 
 int do_top()
 {
 	// TODO: your code here
+	usys_top();
 	return 0;
 }
 
-void fs_scan(char *path)
+
+void fs_scan(char *path, int type, char *buf, char *complement, int complement_cnt)
 {
 	// TODO: your code here
+	// see fs_read() to learn how to use file system API
+	ipc_msg_t *ipc_msg;
+	int ret;
+	struct fs_request fr;
+
+	off_t offset = 0;
+
+	struct dirent* dent = (struct dirent*)TMPFS_SCAN_BUF_VADDR;
+
+	while (1) {
+		ipc_msg = ipc_create_msg(tmpfs_ipc_struct, sizeof(struct fs_request), 1);
+		
+		fr.req = FS_REQ_SCAN;
+		fr.offset = offset;
+		strcpy((void*)fr.path, path);
+		fr.buff = (char*)TMPFS_SCAN_BUF_VADDR;
+		fr.count = PAGE_SIZE;
+
+		ipc_set_msg_cap(ipc_msg, 0, tmpfs_scan_pmo_cap);
+		ipc_set_msg_data(ipc_msg, (char*)&fr, 0, sizeof(struct fs_request));
+
+		ret = ipc_call(tmpfs_ipc_struct, ipc_msg);
+		ipc_destroy_msg(ipc_msg);
+
+		if (ret == 0)
+			break;
+
+		offset += ret;
+		while (ret--) {
+			if (type == SCAN_FOR_LS)
+				printf("%s\n", dent->d_name);
+			else if (type == SCAN_FOR_COMPLEMENT) {
+				if (strstr(dent->d_name, buf) && complement_cnt > 0) {
+					strcpy(complement, dent->d_name);
+					--complement_cnt;
+				}
+			}
+			dent = (struct dirent*)((void*)dent + dent->d_reclen);
+		}
+
+	}
 }
 
 int do_ls(char *cmdline)
@@ -90,22 +152,67 @@ int do_ls(char *cmdline)
 	cmdline += 2;
 	while (*cmdline == ' ')
 		cmdline++;
+
+	if(*cmdline != '/')
+		strcat(pathbuf, pwd);
+	
 	strcat(pathbuf, cmdline);
-	fs_scan(pathbuf);
+	usys_putc('\n');
+	fs_scan(pathbuf, SCAN_FOR_LS, NULL, NULL, 0);
 	return 0;
+}
+
+int fs_read(char *path, int* cap)
+{
+	ipc_msg_t *ipc_msg;
+	int ret;
+	struct fs_request fr;
+
+	ipc_msg = ipc_create_msg(tmpfs_ipc_struct, sizeof(struct fs_request), 1);
+	fr.req = FS_REQ_GET_SIZE;
+	strcpy((void*)fr.path, path);
+	ipc_set_msg_data(ipc_msg, (char*)&fr, 0, sizeof(struct fs_request));
+	ret = ipc_call(tmpfs_ipc_struct, ipc_msg);
+
+	*cap = usys_create_pmo(ret, PMO_DATA);
+	usys_map_pmo(SELF_CAP, *cap, TMPFS_READ_BUF_VADDR, VM_READ | VM_WRITE);
+	
+	fr.req = FS_REQ_READ;
+	strcpy((void*)fr.path, path);
+	fr.offset = 0;
+	fr.buff = (char*)TMPFS_READ_BUF_VADDR;
+	fr.count = ret;
+	fr.req = FS_REQ_READ;
+	ipc_set_msg_cap(ipc_msg, 0, *cap);
+	ipc_set_msg_data(ipc_msg, (char*)&fr, 0, sizeof(struct fs_request));
+	ret = ipc_call(tmpfs_ipc_struct, ipc_msg);
+
+	ipc_destroy_msg(ipc_msg);
+	return ret;
 }
 
 int do_cat(char *cmdline)
 {
 	char pathbuf[BUFLEN];
+	int i;
+	int cap;
 
 	pathbuf[0] = '\0';
 	cmdline += 3;
 	while (*cmdline == ' ')
 		cmdline++;
+
+	if (!*cmdline)
+		return 0;
+
+	if (*cmdline != '/')
+		strcat(pathbuf, pwd);
+
 	strcat(pathbuf, cmdline);
-	// fs_scan(pathbuf);
-	printf("apple banana This is a test file.\n");
+	i = fs_read(pathbuf, &cap);
+	if (i > 0)
+		printf("%s",(char*)TMPFS_READ_BUF_VADDR);
+	usys_unmap_pmo(SELF_CAP, cap, TMPFS_READ_BUF_VADDR);
 	return 0;
 }
 

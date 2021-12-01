@@ -15,7 +15,14 @@ static void fs_dispatch(ipc_msg_t * ipc_msg)
 		switch (fr->req) {
 		case FS_REQ_SCAN:{
 				// TODO: you code here
-				ret = fs_server_scan(fr->path, fr->offset, fr->buff, fr->count);
+				if (fr->buff == (char*)TMPFS_SCAN_BUF_VADDR) {
+					int cap = ipc_get_msg_cap(ipc_msg, 0);
+					usys_map_pmo(SELF_CAP, cap, TMPFS_SCAN_BUF_VADDR, VM_READ | VM_WRITE);
+					ret = fs_server_scan(fr->path, fr->offset, fr->buff, fr->count);
+					usys_unmap_pmo(SELF_CAP, cap, TMPFS_SCAN_BUF_VADDR);
+				} else {
+					ret = fs_server_scan(fr->path, fr->offset, fr->buff, fr->count);
+				}
 				break;
 			}
 		case FS_REQ_MKDIR:
@@ -47,13 +54,19 @@ static void fs_dispatch(ipc_msg_t * ipc_msg)
 			}
 		case FS_REQ_READ:{
 				// TODO: you code here
-				ret = fs_server_read(fr->path, fr->offset, fr->buff, fr->count);
+				if (fr->buff == (char*)TMPFS_READ_BUF_VADDR) {
+					int cap = ipc_get_msg_cap(ipc_msg, 0);
+					usys_map_pmo(SELF_CAP, cap, TMPFS_READ_BUF_VADDR, VM_READ | VM_WRITE);
+					ret = fs_server_read(fr->path, fr->offset, fr->buff, fr->count);
+					usys_unmap_pmo(SELF_CAP, cap, TMPFS_READ_BUF_VADDR);
+				} else {
+					ret = fs_server_read(fr->path, fr->offset, fr->buff, fr->count);
+				}
 				break;
 			}
 		case FS_REQ_GET_SIZE:{
 				ret = fs_server_get_size(fr->path);
 				break;
-
 			}
 		default:
 			error("%s: %d Not impelemented yet\n", __func__,
