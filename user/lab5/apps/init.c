@@ -21,14 +21,28 @@ int fs_server_cap;
 #define BUFLEN	4096
 static char pwd[BUFLEN] = "/";
 
-#define SCAN_FOR_LS 0
-#define SCAN_FOR_COMPLEMENT 1
-void fs_scan(char *path, int type, char *buf, char *complement, int complement_cnt);
+int fs_scan(char *path, off_t offset);
 
 static int do_complement(char *buf, char *complement, int complement_time)
 {
 	// TODO: your code here
-	fs_scan(pwd, SCAN_FOR_COMPLEMENT, buf, complement, complement_time);
+	off_t offset = 0;
+	struct dirent* dent = (struct dirent*)TMPFS_SCAN_BUF_VADDR;
+
+	while (1) {
+		int ret = fs_scan(pwd, offset);
+		if (ret == 0)
+			break;
+		
+		offset += ret;
+		while (ret--) {
+			if (strstr(dent->d_name, buf) == dent->d_name && complement_time-- > 0) {
+				strcpy(complement, dent->d_name);
+			}
+			dent = (struct dirent*)((void*)dent + dent->d_reclen);
+		}
+	}
+
 	printf("%s", complement); 
 	return 0;
 }
@@ -98,7 +112,7 @@ int do_top()
 }
 
 
-void fs_scan(char *path, int type, char *buf, char *complement, int complement_cnt)
+int fs_scan(char *path, off_t offset)
 {
 	// TODO: your code here
 	// see fs_read() to learn how to use file system API
@@ -106,42 +120,21 @@ void fs_scan(char *path, int type, char *buf, char *complement, int complement_c
 	int ret;
 	struct fs_request fr;
 
-	off_t offset = 0;
+	ipc_msg = ipc_create_msg(tmpfs_ipc_struct, sizeof(struct fs_request), 1);
+	
+	fr.req = FS_REQ_SCAN;
+	fr.offset = offset;
+	strcpy((void*)fr.path, path);
+	fr.buff = (char*)TMPFS_SCAN_BUF_VADDR;
+	fr.count = PAGE_SIZE;
 
-	struct dirent* dent = (struct dirent*)TMPFS_SCAN_BUF_VADDR;
+	ipc_set_msg_cap(ipc_msg, 0, tmpfs_scan_pmo_cap);
+	ipc_set_msg_data(ipc_msg, (char*)&fr, 0, sizeof(struct fs_request));
 
-	while (1) {
-		ipc_msg = ipc_create_msg(tmpfs_ipc_struct, sizeof(struct fs_request), 1);
-		
-		fr.req = FS_REQ_SCAN;
-		fr.offset = offset;
-		strcpy((void*)fr.path, path);
-		fr.buff = (char*)TMPFS_SCAN_BUF_VADDR;
-		fr.count = PAGE_SIZE;
+	ret = ipc_call(tmpfs_ipc_struct, ipc_msg);
+	ipc_destroy_msg(ipc_msg);
 
-		ipc_set_msg_cap(ipc_msg, 0, tmpfs_scan_pmo_cap);
-		ipc_set_msg_data(ipc_msg, (char*)&fr, 0, sizeof(struct fs_request));
-
-		ret = ipc_call(tmpfs_ipc_struct, ipc_msg);
-		ipc_destroy_msg(ipc_msg);
-
-		if (ret == 0)
-			break;
-
-		offset += ret;
-		while (ret--) {
-			if (type == SCAN_FOR_LS)
-				printf("%s\n", dent->d_name);
-			else if (type == SCAN_FOR_COMPLEMENT) {
-				if (strstr(dent->d_name, buf) && complement_cnt > 0) {
-					strcpy(complement, dent->d_name);
-					--complement_cnt;
-				}
-			}
-			dent = (struct dirent*)((void*)dent + dent->d_reclen);
-		}
-
-	}
+	return ret;	
 }
 
 int do_ls(char *cmdline)
@@ -158,7 +151,22 @@ int do_ls(char *cmdline)
 	
 	strcat(pathbuf, cmdline);
 	usys_putc('\n');
-	fs_scan(pathbuf, SCAN_FOR_LS, NULL, NULL, 0);
+
+	off_t offset = 0;
+	struct dirent* dent = (struct dirent*)TMPFS_SCAN_BUF_VADDR;
+
+	while (1) {
+		int ret = fs_scan(pathbuf, offset);
+		if (ret == 0)
+			break;
+		
+		offset += ret;
+		while (ret--) {
+			printf("%s\n", dent->d_name);
+			dent = (struct dirent*)((void*)dent + dent->d_reclen);
+		}
+	}
+
 	return 0;
 }
 
