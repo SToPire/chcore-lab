@@ -39,7 +39,7 @@ gdbport:
 docker: FORCE	
 	./scripts/run_docker.sh
 
-grade: build FORCE
+grade: user build FORCE
 	@echo "make grade"
 	@echo "LAB"$(LAB)": test >>>>>>>>>>>>>>>>>"
 ifeq ($(LAB), 2)
